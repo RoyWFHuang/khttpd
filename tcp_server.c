@@ -4,9 +4,10 @@
 #include <linux/sched/signal.h>
 #include <linux/tcp.h>
 
-#include "http_parser.h"
-#include "http_server.h"
+// #include "http_parser.h"
+#include "tcp_server.h"
 
+/*
 #define CRLF "\r\n"
 
 #define HTTP_RESPONSE_200_DUMMY                               \
@@ -29,15 +30,27 @@
     "HTTP/1.1 501 Not Implemented" CRLF "Server: " KBUILD_MODNAME CRLF \
     "Content-Type: text/plain" CRLF "Content-Length: 21" CRLF          \
     "Connection: KeepAlive" CRLF CRLF "501 Not Implemented" CRLF
+*/
 
 #define RECV_BUFFER_SIZE 4096
 
-struct http_request {
-    struct socket *socket;
-    enum http_method method;
-    char request_url[128];
-    int complete;
-};
+// struct http_request {
+//     struct socket *socket;
+//     enum http_method method;
+//     char request_url[128];
+//     int complete;
+// };
+#define MAX_SZ 4096
+typedef struct _tmsg {
+    char *msg;
+    int len;
+} tmsg;
+
+typedef struct _tring_buf {
+    char *buf[MAX_SZ];
+    int head;
+    int tail;
+} tring_buf;
 
 static int http_server_recv(struct socket *sock, char *buf, size_t size)
 {
@@ -49,7 +62,7 @@ static int http_server_recv(struct socket *sock, char *buf, size_t size)
                          .msg_flags = 0};
     return kernel_recvmsg(sock, &msg, &iov, 1, size, msg.msg_flags);
 }
-
+/*
 static int http_server_send(struct socket *sock, const char *buf, size_t size)
 {
     struct msghdr msg = {.msg_name = NULL,
@@ -140,20 +153,20 @@ static int http_parser_callback_message_complete(http_parser *parser)
     request->complete = 1;
     return 0;
 }
-
+*/
 static int http_server_worker(void *arg)
 {
     char *buf;
-    struct http_parser parser;
-    struct http_parser_settings setting = {
-        .on_message_begin = http_parser_callback_message_begin,
-        .on_url = http_parser_callback_request_url,
-        .on_header_field = http_parser_callback_header_field,
-        .on_header_value = http_parser_callback_header_value,
-        .on_headers_complete = http_parser_callback_headers_complete,
-        .on_body = http_parser_callback_body,
-        .on_message_complete = http_parser_callback_message_complete};
-    struct http_request request;
+    // struct http_parser parser;
+    // struct http_parser_settings setting = {
+    //     .on_message_begin = http_parser_callback_message_begin,
+    //     .on_url = http_parser_callback_request_url,
+    //     .on_header_field = http_parser_callback_header_field,
+    //     .on_header_value = http_parser_callback_header_value,
+    //     .on_headers_complete = http_parser_callback_headers_complete,
+    //     .on_body = http_parser_callback_body,
+    //     .on_message_complete = http_parser_callback_message_complete};
+    // struct http_request request;
     struct socket *socket = (struct socket *) arg;
 
     allow_signal(SIGKILL);
@@ -165,9 +178,9 @@ static int http_server_worker(void *arg)
         return -1;
     }
 
-    request.socket = socket;
-    http_parser_init(&parser, HTTP_REQUEST);
-    parser.data = &request;
+    // request.socket = socket;
+    // http_parser_init(&parser, HTTP_REQUEST);
+    // parser.data = &request;
     while (!kthread_should_stop()) {
         int ret = http_server_recv(socket, buf, RECV_BUFFER_SIZE - 1);
         if (ret <= 0) {
@@ -175,9 +188,10 @@ static int http_server_worker(void *arg)
                 pr_err("recv error: %d\n", ret);
             break;
         }
-        http_parser_execute(&parser, &setting, buf, ret);
-        if (request.complete && !http_should_keep_alive(&parser))
-            break;
+        printk("%s", buf);
+        // http_parser_execute(&parser, &setting, buf, ret);
+        // if (request.complete && !http_should_keep_alive(&parser))
+        //     break;
     }
     kernel_sock_shutdown(socket, SHUT_RDWR);
     sock_release(socket);

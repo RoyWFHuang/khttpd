@@ -5,12 +5,19 @@ LDFLAGS_user = -lpthread
 
 obj-m += khttpd.o
 khttpd-objs := \
-	http_parser.o \
-	http_server.o \
+	tcp_server.o \
+	tcp_main.o \
 	main.o
+# khttpd-objs := \
+# 	http_parser.o \
+# 	http_server.o \
+# 	main.o
 
 GIT_HOOKS := .git/hooks/applied
-all: $(GIT_HOOKS) http_parser.c htstress
+# all: $(GIT_HOOKS) http_parser.c htstress
+# 	make -C $(KDIR) M=$(PWD) modules
+
+all: $(GIT_HOOKS) htstress
 	make -C $(KDIR) M=$(PWD) modules
 
 $(GIT_HOOKS):
