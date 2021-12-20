@@ -5,8 +5,8 @@
 #include <linux/tcp.h>
 
 // #include "http_parser.h"
+#include "tcp_event.h"
 #include "tcp_server.h"
-
 /*
 #define CRLF "\r\n"
 
@@ -181,6 +181,8 @@ static int http_server_worker(void *arg)
         // http_parser_execute(&parser, &setting, buf, ret);
         // if (request.complete && !http_should_keep_alive(&parser))
         //     break;
+        if (set_event_and_data(EPOLLIN, buf, ret) < 0)
+            break;
     }
     kernel_sock_shutdown(socket, SHUT_RDWR);
     sock_release(socket);

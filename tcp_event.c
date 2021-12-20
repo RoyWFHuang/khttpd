@@ -12,19 +12,6 @@ static struct class *vpoll_class = NULL;
 
 #if 1
 
-
-// #define MAX_SZ 4096
-typedef struct _tmsg {
-    char *msg;
-    int len;
-} tmsg;
-
-// typedef struct _tring_buf {
-//     char *buf[MAX_SZ];
-//     int head;
-//     int tail;
-// } tring_buf;
-
 struct vpoll_data {
     wait_queue_head_t wqh;
     // __poll_t events;
@@ -45,6 +32,11 @@ static int init_queue(void)
     init_waitqueue_head(&vpoll_data->wqh);
     // file->private_data = vpoll_data;
     return 0;
+}
+
+static void deinit_queue(void)
+{
+    kfree(vpoll_data);
 }
 
 static int vpoll_open(struct inode *inode, struct file *file)
@@ -70,7 +62,7 @@ static int vpoll_release(struct inode *inode, struct file *file)
 
 static long vpoll_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-    struct vpoll_data *vpoll_data = file->private_data;
+    // struct vpoll_data *vpoll_data = file->private_data;
     __poll_t events = arg & EPOLLALLMASK;
     long res = 10;
     int idx = 0;
@@ -110,9 +102,36 @@ static long vpoll_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     return res;
 }
 
+long set_event_and_data(__poll_t event,
+                        unsigned char *data,
+                        unsigned int data_len)
+{
+    __poll_t events = event & EPOLLALLMASK;
+    long res = 10;
+    int idx = 0;
+    spin_lock_irq(&vpoll_data->wqh.lock);
+    if (0 != vpoll_data->events[vpoll_data->tail]) {
+        printk("Error event full\n");
+        spin_unlock_irq(&vpoll_data->wqh.lock);
+        return -EINVAL;
+    }
+    idx = vpoll_data->tail;
+    vpoll_data->tail = (vpoll_data->tail + 1) & QUEUE_MASK;
+    spin_unlock_irq(&vpoll_data->wqh.lock);
+
+    vpoll_data->events[idx] |= events;
+    // printk("set (%d) = %d", idx, events);
+    vpoll_data->buf[idx] = vmalloc(data_len);
+    memcpy(vpoll_data->buf[idx], data, data_len);
+
+    if (waitqueue_active(&vpoll_data->wqh)) {
+        wake_up_poll(&vpoll_data->wqh, events);
+    }
+    return res;
+}
+
 static __poll_t vpoll_poll(struct file *file, struct poll_table_struct *wait)
 {
-    struct vpoll_data *vpoll_data = file->private_data;
     __poll_t events;
     poll_wait(file, &vpoll_data->wqh, wait);
     events = READ_ONCE(vpoll_data->events[vpoll_data->head]);
@@ -198,8 +217,7 @@ static ssize_t vpoll_read(struct file *file,
     int ret;
     __poll_t events;
 
-    struct vpoll_data *vpoll_data = file->private_data;
-
+    // struct vpoll_data *vpoll_data = file->private_data;
     events = READ_ONCE(vpoll_data->events[vpoll_data->head]);
     read = strlen(vpoll_data->buf[vpoll_data->head]);
     ret = copy_to_user(buf, vpoll_data->buf[vpoll_data->head], read);
@@ -252,8 +270,8 @@ int data_vpoll_init(void)
         goto error_device_destroy;
 
     printk(KERN_INFO NAME ": loaded\n");
-    init_queue();
-    return 0;
+    ret = init_queue();
+    return ret;
 
 error_device_destroy:
     device_destroy(vpoll_class, major);
@@ -266,7 +284,7 @@ error_unregister_chrdev_region:
 
 void data_vpoll_exit(void)
 {
-    kfree(vpoll_data);
+    deinit_queue();
     device_destroy(vpoll_class, major);
     cdev_del(&vpoll_cdev);
     class_destroy(vpoll_class);
