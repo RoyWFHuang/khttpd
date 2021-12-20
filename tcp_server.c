@@ -146,16 +146,6 @@ static int http_parser_callback_message_complete(http_parser *parser)
 static int http_server_worker(void *arg)
 {
     char *buf;
-    // struct http_parser parser;
-    // struct http_parser_settings setting = {
-    //     .on_message_begin = http_parser_callback_message_begin,
-    //     .on_url = http_parser_callback_request_url,
-    //     .on_header_field = http_parser_callback_header_field,
-    //     .on_header_value = http_parser_callback_header_value,
-    //     .on_headers_complete = http_parser_callback_headers_complete,
-    //     .on_body = http_parser_callback_body,
-    //     .on_message_complete = http_parser_callback_message_complete};
-    // struct http_request request;
     struct socket *socket = (struct socket *) arg;
 
     allow_signal(SIGKILL);
@@ -167,9 +157,6 @@ static int http_server_worker(void *arg)
         return -1;
     }
 
-    // request.socket = socket;
-    // http_parser_init(&parser, HTTP_REQUEST);
-    // parser.data = &request;
     while (!kthread_should_stop()) {
         int ret = http_server_recv(socket, buf, RECV_BUFFER_SIZE - 1);
         if (ret <= 0) {
@@ -177,10 +164,6 @@ static int http_server_worker(void *arg)
                 pr_err("recv error: %d\n", ret);
             break;
         }
-        printk("%s", buf);
-        // http_parser_execute(&parser, &setting, buf, ret);
-        // if (request.complete && !http_should_keep_alive(&parser))
-        //     break;
         if (set_event_and_data(EPOLLIN, buf, ret) < 0)
             break;
     }
