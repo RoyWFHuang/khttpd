@@ -6,6 +6,7 @@
 #include <linux/version.h>
 #include <net/sock.h>
 
+#include "tcp_event.h"
 #include "tcp_main.h"
 
 static int __init ktcp_serv_init(void)
@@ -14,12 +15,15 @@ static int __init ktcp_serv_init(void)
     int err;
     if (0 != (err = ktcp_init()))
         return err;
+    if (0 != (err = data_vpoll_init()))
+        return err;
     return 0;
 }
 
 static void __exit ktcp_serv_exit(void)
 {
     ktcp_exit();
+    data_vpoll_exit();
 }
 
 module_init(ktcp_serv_init);

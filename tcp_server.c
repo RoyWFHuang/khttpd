@@ -40,17 +40,6 @@
 //     char request_url[128];
 //     int complete;
 // };
-#define MAX_SZ 4096
-typedef struct _tmsg {
-    char *msg;
-    int len;
-} tmsg;
-
-typedef struct _tring_buf {
-    char *buf[MAX_SZ];
-    int head;
-    int tail;
-} tring_buf;
 
 static int http_server_recv(struct socket *sock, char *buf, size_t size)
 {

@@ -7,6 +7,7 @@ obj-m += khttpd.o
 khttpd-objs := \
 	tcp_server.o \
 	tcp_main.o \
+	tcp_event.o \
 	main.o
 # khttpd-objs := \
 # 	http_parser.o \
