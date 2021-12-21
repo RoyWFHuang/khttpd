@@ -124,11 +124,11 @@ long set_event_and_data(__poll_t event,
     vpoll_data->tail = (vpoll_data->tail + 1) & QUEUE_MASK;
     spin_unlock_irq(&vpoll_data->wqh.lock);
 
-    vpoll_data->events[idx] |= events;
     // printk("set (%d) = %d", idx, events);
     vpoll_data->data[idx].buf = vmalloc(data_len);
     memcpy(vpoll_data->data[idx].buf, data, data_len);
     vpoll_data->data[idx].len = data_len;
+    vpoll_data->events[idx] |= events;
 
     if (waitqueue_active(&vpoll_data->wqh)) {
         wake_up_poll(&vpoll_data->wqh, events);
