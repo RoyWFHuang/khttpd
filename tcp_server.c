@@ -166,6 +166,7 @@ static int http_server_worker(void *arg)
         }
         if (set_event_and_data(EPOLLIN, buf, ret) < 0)
             break;
+        // printk("(%d)%s", ret, buf);
     }
     kernel_sock_shutdown(socket, SHUT_RDWR);
     sock_release(socket);

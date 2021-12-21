@@ -11,12 +11,15 @@ static struct cdev vpoll_cdev;
 static struct class *vpoll_class = NULL;
 
 #if 1
-
+typedef struct _tmsg_data {
+    char *buf;
+    int len;
+} tmsg_data;
 struct vpoll_data {
     wait_queue_head_t wqh;
     // __poll_t events;
     __poll_t events[MAX_SZ];
-    char *buf[MAX_SZ];
+    tmsg_data data[MAX_SZ];
     int head, tail;
 };
 struct vpoll_data *vpoll_data;
@@ -79,13 +82,15 @@ static long vpoll_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     switch (cmd) {
     case VPOLL_IO_ADDEVENTS:
         vpoll_data->events[idx] |= events;
-        vpoll_data->buf[idx] = vmalloc(10);
-        memcpy(vpoll_data->buf[idx], "eventadd", 8);
+        vpoll_data->data[idx].buf = vmalloc(10);
+        memcpy(vpoll_data->data[idx].buf, "eventadd", 8);
+        vpoll_data->data[idx].len = 8;
         break;
     case VPOLL_IO_DELEVENTS:
         vpoll_data->events[idx] &= ~events;
-        vpoll_data->buf[idx] = vmalloc(10);
-        memcpy(vpoll_data->buf[idx], "eventdel", 8);
+        vpoll_data->data[idx].buf = vmalloc(10);
+        memcpy(vpoll_data->data[idx].buf, "eventdel", 8);
+        vpoll_data->data[idx].len = 8;
         break;
     default:
         res = -EINVAL;
@@ -121,8 +126,9 @@ long set_event_and_data(__poll_t event,
 
     vpoll_data->events[idx] |= events;
     // printk("set (%d) = %d", idx, events);
-    vpoll_data->buf[idx] = vmalloc(data_len);
-    memcpy(vpoll_data->buf[idx], data, data_len);
+    vpoll_data->data[idx].buf = vmalloc(data_len);
+    memcpy(vpoll_data->data[idx].buf, data, data_len);
+    vpoll_data->data[idx].len = data_len;
 
     if (waitqueue_active(&vpoll_data->wqh)) {
         wake_up_poll(&vpoll_data->wqh, events);
@@ -214,16 +220,21 @@ static ssize_t vpoll_read(struct file *file,
                           loff_t *ppos)
 {
     unsigned int read;
-    int ret;
+    int ret, idx;
     __poll_t events;
 
     // struct vpoll_data *vpoll_data = file->private_data;
-    events = READ_ONCE(vpoll_data->events[vpoll_data->head]);
-    read = strlen(vpoll_data->buf[vpoll_data->head]);
-    ret = copy_to_user(buf, vpoll_data->buf[vpoll_data->head], read);
-    vpoll_data->events[vpoll_data->head] &= ~events;
-    vfree(vpoll_data->buf[vpoll_data->head]);
-    printk("vpoll_data->head = %d\n", vpoll_data->head);
+    // printk("read data\n");
+    idx = READ_ONCE(vpoll_data->head);
+    events = READ_ONCE(vpoll_data->events[idx]);
+    read = vpoll_data->data[idx].len;
+    // read = strlen(vpoll_data->buf[idx]);
+    // printk("%s", vpoll_data->data[idx].buf);
+    ret = copy_to_user(buf, vpoll_data->data[idx].buf, read);
+    vpoll_data->events[idx] &= ~events;
+    vfree(vpoll_data->data[idx].buf);
+
+    // printk("vpoll_data->head = %d\n", vpoll_data->head);
     vpoll_data->head = (vpoll_data->head + 1) & QUEUE_MASK;
 
     return ret ? ret : read;
