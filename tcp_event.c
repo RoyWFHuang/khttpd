@@ -39,6 +39,13 @@ static int init_queue(void)
 
 static void deinit_queue(void)
 {
+    int i = 0;
+    for (i = 0; i < MAX_SZ; i++)
+        if (0 != vpoll_data->events[i]) {
+            printk("find %d is not taken", i);
+            vfree(vpoll_data->data[i].buf);
+        }
+
     kfree(vpoll_data);
 }
 
