@@ -10,7 +10,7 @@
 #define EPOLLALLMASK ((__force __poll_t) 0x0fffffff)
 
 
-#define MAX_SZ 4096
+#define MAX_SZ (8192 << 2)
 #define QUEUE_MASK (MAX_SZ - 1)
 int data_vpoll_init(void);
 

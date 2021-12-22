@@ -4,7 +4,7 @@
 #include <linux/module.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
-
+#include <linux/vmalloc.h>
 
 static int major = -1;
 static struct cdev vpoll_cdev;
@@ -78,6 +78,7 @@ static long vpoll_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     int idx = 0;
     spin_lock_irq(&vpoll_data->wqh.lock);
     if (0 != vpoll_data->events[vpoll_data->tail]) {
+        printk("Error event full\n");
         spin_unlock_irq(&vpoll_data->wqh.lock);
         return -EINVAL;
     }
