@@ -3,7 +3,8 @@
 
 `khttpd` is an experimental tcp server implemented as Linux kernel module.
 The server defaults to port 12345, but this can be easily configured using
-command line argument `port=?` when you are about to load the kernel module.
+command line argument `port=?`and  `backlog=?` when you are about to load
+the kernel module.
 
 When the tcp receiving data, this will copy data to ring buffer and set event to notify user (using epoll) getting data
 ## TODO
