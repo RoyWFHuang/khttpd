@@ -123,12 +123,12 @@ long set_event_and_data(__poll_t event,
     long res = 10;
     int idx = 0;
     spin_lock_irq(&vpoll_data->wqh.lock);
-    if (0 != vpoll_data->events[vpoll_data->tail]) {
+    idx = vpoll_data->tail;
+    if (0 != vpoll_data->events[idx]) {
         printk("Error event full\n");
         spin_unlock_irq(&vpoll_data->wqh.lock);
         return -EINVAL;
     }
-    idx = vpoll_data->tail;
     vpoll_data->tail = (vpoll_data->tail + 1) & QUEUE_MASK;
     spin_unlock_irq(&vpoll_data->wqh.lock);
 
