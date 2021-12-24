@@ -1,10 +1,11 @@
 #include "tcp_event.h"
 #include <linux/cdev.h>
 #include <linux/init.h>
+#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
-#include <linux/vmalloc.h>
+// #include <linux/vmalloc.h>
 
 static int major = -1;
 static struct cdev vpoll_cdev;
@@ -43,7 +44,7 @@ static void deinit_queue(void)
     for (i = 0; i < MAX_SZ; i++)
         if (0 != vpoll_data->events[i]) {
             printk("find %d is not taken", i);
-            vfree(vpoll_data->data[i].buf);
+            kfree(vpoll_data->data[i].buf);
         }
 
     kfree(vpoll_data);
@@ -76,29 +77,38 @@ static long vpoll_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     __poll_t events = arg & EPOLLALLMASK;
     long res = 10;
     int idx = 0;
-    spin_lock_irq(&vpoll_data->wqh.lock);
-    if (0 != vpoll_data->events[vpoll_data->tail]) {
-        printk("Error event full\n");
-        spin_unlock_irq(&vpoll_data->wqh.lock);
-        return -EINVAL;
-    }
-    idx = vpoll_data->tail;
-    vpoll_data->tail = (vpoll_data->tail + 1) & QUEUE_MASK;
-    // vpoll_data->tail ++;
-    spin_unlock_irq(&vpoll_data->wqh.lock);
 
     switch (cmd) {
     case VPOLL_IO_ADDEVENTS:
+        spin_lock_irq(&vpoll_data->wqh.lock);
+        if (0 != vpoll_data->events[vpoll_data->tail]) {
+            printk("Error event full\n");
+            spin_unlock_irq(&vpoll_data->wqh.lock);
+            return -EINVAL;
+        }
+        idx = vpoll_data->tail;
+        vpoll_data->tail = (vpoll_data->tail + 1) & QUEUE_MASK;
+        spin_unlock_irq(&vpoll_data->wqh.lock);
+
         vpoll_data->events[idx] |= events;
-        vpoll_data->data[idx].buf = vmalloc(10);
+        vpoll_data->data[idx].buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+        // vpoll_data->data[idx].buf = vmalloc(10);
         memcpy(vpoll_data->data[idx].buf, "eventadd", 8);
         vpoll_data->data[idx].len = 8;
         break;
     case VPOLL_IO_DELEVENTS:
+        printk("remove event");
+        spin_lock_irq(&vpoll_data->wqh.lock);
+        idx = READ_ONCE(vpoll_data->head);
+        if (0 == vpoll_data->events[idx]) {
+            spin_unlock_irq(&vpoll_data->wqh.lock);
+            break;
+        } else {
+            vpoll_data->head = (vpoll_data->head + 1) & QUEUE_MASK;
+            spin_unlock_irq(&vpoll_data->wqh.lock);
+        }
         vpoll_data->events[idx] &= ~events;
-        vpoll_data->data[idx].buf = vmalloc(10);
-        memcpy(vpoll_data->data[idx].buf, "eventdel", 8);
-        vpoll_data->data[idx].len = 8;
+        kfree(vpoll_data->data[idx].buf);
         break;
     default:
         res = -EINVAL;
@@ -133,7 +143,7 @@ long set_event_and_data(__poll_t event,
     spin_unlock_irq(&vpoll_data->wqh.lock);
 
     // printk("set (%d) = %d", idx, events);
-    vpoll_data->data[idx].buf = vmalloc(data_len);
+    vpoll_data->data[idx].buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
     memcpy(vpoll_data->data[idx].buf, data, data_len);
     vpoll_data->data[idx].len = data_len;
     vpoll_data->events[idx] |= events;
@@ -220,7 +230,33 @@ static __poll_t vpoll_poll(struct file *file, struct poll_table_struct *wait)
 }
 
 #endif
+static int vpoll_mmap(struct file *fp, struct vm_area_struct *vma)
+{
+    unsigned int read;
+    int ret, idx;
+    __poll_t events;
+    struct page *v_page = NULL;
+    unsigned long u_vsz = (unsigned long) (vma->vm_end - vma->vm_start);
 
+    idx = READ_ONCE(vpoll_data->head);
+    events = READ_ONCE(vpoll_data->events[idx]);
+    read = vpoll_data->data[idx].len;
+
+    if (read > u_vsz) {
+        ret = -EINVAL;
+        goto out;
+    }
+    v_page = virt_to_page((unsigned long) vpoll_data->data[idx].buf +
+                          (vma->vm_pgoff << PAGE_SHIFT));
+    ret = remap_pfn_range(vma, vma->vm_start, page_to_pfn(v_page), u_vsz,
+                          vma->vm_page_prot);
+
+    // if (ret != 0) {
+    //     goto out;
+    // }
+out:
+    return ret;
+}
 
 static ssize_t vpoll_read(struct file *file,
                           char __user *buf,
@@ -240,7 +276,7 @@ static ssize_t vpoll_read(struct file *file,
     // printk("%s", vpoll_data->data[idx].buf);
     ret = copy_to_user(buf, vpoll_data->data[idx].buf, read);
     vpoll_data->events[idx] &= ~events;
-    vfree(vpoll_data->data[idx].buf);
+    kfree(vpoll_data->data[idx].buf);
 
     // printk("vpoll_data->head = %d\n", vpoll_data->head);
     vpoll_data->head = (vpoll_data->head + 1) & QUEUE_MASK;
@@ -255,6 +291,7 @@ static const struct file_operations fops = {
     .unlocked_ioctl = vpoll_ioctl,
     .poll = vpoll_poll,  // for epoll_ctl
     .read = vpoll_read,
+    .mmap = vpoll_mmap,
 };
 
 static char *vpoll_devnode(struct device *dev, umode_t *mode)
