@@ -11,7 +11,7 @@ When the tcp receiving data, this will copy data to ring buffer and set event to
 * Introduce CMWQ.
 * Improve memory management.
 * Request queue and/or cache
-
+* If tcp input data larger then one page size
 ## License
 
 `khttpd` is released under the MIT License. Use of this source code is governed by
