@@ -43,7 +43,7 @@ static void deinit_queue(void)
     int i = 0;
     for (i = 0; i < MAX_SZ; i++)
         if (0 != vpoll_data->events[i]) {
-            printk("find %d is not taken", i);
+            pr_info("find %d is not taken", i);
             kfree(vpoll_data->data[i].buf);
         }
 
@@ -82,7 +82,7 @@ static long vpoll_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     case VPOLL_IO_ADDEVENTS:
         spin_lock_irq(&vpoll_data->wqh.lock);
         if (0 != vpoll_data->events[vpoll_data->tail]) {
-            printk("Error event full\n");
+            pr_err("Error event full\n");
             spin_unlock_irq(&vpoll_data->wqh.lock);
             return -EINVAL;
         }
@@ -97,7 +97,7 @@ static long vpoll_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         vpoll_data->data[idx].len = 8;
         break;
     case VPOLL_IO_DELEVENTS:
-        printk("remove event");
+        pr_debug("remove event");
         spin_lock_irq(&vpoll_data->wqh.lock);
         idx = READ_ONCE(vpoll_data->head);
         if (0 == vpoll_data->events[idx]) {
@@ -135,7 +135,7 @@ long set_event_and_data(__poll_t event,
     spin_lock_irq(&vpoll_data->wqh.lock);
     idx = vpoll_data->tail;
     if (0 != vpoll_data->events[idx]) {
-        printk("Error event full\n");
+        pr_err("Error event full\n");
         spin_unlock_irq(&vpoll_data->wqh.lock);
         return -EINVAL;
     }
@@ -326,7 +326,7 @@ int data_vpoll_init(void)
     if ((ret = cdev_add(&vpoll_cdev, major, 1)) < 0)
         goto error_device_destroy;
 
-    printk(KERN_INFO NAME ": loaded\n");
+    pr_info(KERN_INFO NAME ": loaded\n");
     ret = init_queue();
     return ret;
 
@@ -346,7 +346,7 @@ void data_vpoll_exit(void)
     cdev_del(&vpoll_cdev);
     class_destroy(vpoll_class);
     unregister_chrdev_region(major, 1);
-    printk(KERN_INFO NAME ": unloaded\n");
+    pr_info(KERN_INFO NAME ": unloaded\n");
 }
 
 // module_init(vpoll_init);
