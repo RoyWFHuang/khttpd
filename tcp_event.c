@@ -143,7 +143,8 @@ long set_event_and_data(__poll_t event,
     spin_unlock_irq(&vpoll_data->wqh.lock);
 
     // printk("set (%d) = %d", idx, events);
-    vpoll_data->data[idx].buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+    vpoll_data->data[idx].buf =
+        kmalloc(PAGE_SIZE * (data_len >> PAGE_SHIFT), GFP_KERNEL);
     memcpy(vpoll_data->data[idx].buf, data, data_len);
     vpoll_data->data[idx].len = data_len;
     vpoll_data->events[idx] |= events;
