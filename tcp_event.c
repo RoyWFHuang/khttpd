@@ -303,21 +303,23 @@ static char *vpoll_devnode(struct device *dev, umode_t *mode)
     *mode = 0666;
     return NULL;
 }
-
+extern char *epolldev_name;
 int data_vpoll_init(void)
 {
     int ret;
     struct device *dev;
+    // pr_err("PAGE_SIZE = %lu", PAGE_SIZE);
+    // pr_info("PAGE_SHIFT = %u", PAGE_SHIFT);
 
-    if ((ret = alloc_chrdev_region(&major, 0, 1, NAME)) < 0)
+    if ((ret = alloc_chrdev_region(&major, 0, 1, epolldev_name)) < 0)
         return ret;
-    vpoll_class = class_create(THIS_MODULE, NAME);
+    vpoll_class = class_create(THIS_MODULE, epolldev_name);
     if (IS_ERR(vpoll_class)) {
         ret = PTR_ERR(vpoll_class);
         goto error_unregister_chrdev_region;
     }
     vpoll_class->devnode = vpoll_devnode;
-    dev = device_create(vpoll_class, NULL, major, NULL, NAME);
+    dev = device_create(vpoll_class, NULL, major, NULL, epolldev_name);
     if (IS_ERR(dev)) {
         ret = PTR_ERR(dev);
         goto error_class_destroy;
@@ -326,7 +328,7 @@ int data_vpoll_init(void)
     if ((ret = cdev_add(&vpoll_cdev, major, 1)) < 0)
         goto error_device_destroy;
 
-    pr_info(KERN_INFO NAME ": loaded\n");
+    pr_info(KERN_INFO "%s: loaded\n", epolldev_name);
     ret = init_queue();
     return ret;
 
@@ -346,7 +348,7 @@ void data_vpoll_exit(void)
     cdev_del(&vpoll_cdev);
     class_destroy(vpoll_class);
     unregister_chrdev_region(major, 1);
-    pr_info(KERN_INFO NAME ": unloaded\n");
+    pr_info(KERN_INFO "%s: unloaded\n", epolldev_name);
 }
 
 // module_init(vpoll_init);

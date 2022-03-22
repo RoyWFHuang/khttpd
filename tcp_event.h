@@ -3,7 +3,7 @@
 
 #include <linux/poll.h>
 
-#define NAME "vpoll"
+#define DEFAULT_NAME "vpoll"
 #define VPOLL_IOC_MAGIC '^'
 #define VPOLL_IO_ADDEVENTS _IO(VPOLL_IOC_MAGIC, 1)
 #define VPOLL_IO_DELEVENTS _IO(VPOLL_IOC_MAGIC, 2)

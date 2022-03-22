@@ -3,16 +3,19 @@ KDIR=/lib/modules/$(shell uname -r)/build
 CFLAGS_user = -std=gnu11 -Wall -Wextra -Werror
 LDFLAGS_user = -lpthread
 
-obj-m += khttpd.o
-khttpd-objs := \
+obj-m += ktdb_vpoll.o
+obj-m += ktbaldb_vpoll.o
+ktdb_vpoll-objs := \
 	tcp_server.o \
 	tcp_main.o \
 	tcp_event.o \
 	main.o
-# khttpd-objs := \
-# 	http_parser.o \
-# 	http_server.o \
-# 	main.o
+
+ktbaldb_vpoll-objs := \
+	tcp_server.o \
+	tcp_main.o \
+	tcp_event.o \
+	main.o
 
 GIT_HOOKS := .git/hooks/applied
 # all: $(GIT_HOOKS) http_parser.c htstress

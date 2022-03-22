@@ -6,12 +6,16 @@
 #include <linux/tcp.h>
 #include <linux/version.h>
 #include <net/sock.h>
+#include "tcp_event.h"
 #include "tcp_server.h"
+
 
 static ushort port = DEFAULT_PORT;
 module_param(port, ushort, S_IRUGO);
 static ushort backlog = DEFAULT_BACKLOG;
 module_param(backlog, ushort, S_IRUGO);
+char *epolldev_name = DEFAULT_NAME;
+module_param(epolldev_name, charp, 0000);
 
 static struct socket *listen_socket;
 static struct http_server_param param;
@@ -97,6 +101,11 @@ static int open_listen_socket(ushort port, ushort backlog, struct socket **res)
         pr_err("sock_create() failure, err=%d\n", err);
         return err;
     }
+
+    // int optval = 1;
+    // err = setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, 1);
+    // if (err < 0)
+    //     goto bail_setsockopt;
 
     err = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, 1);
     if (err < 0)
